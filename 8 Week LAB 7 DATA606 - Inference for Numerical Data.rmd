@@ -1,0 +1,269 @@
+---
+title: 'Inference for numerical data'
+author: "Christian Thieme"
+date: "3/18/2020"
+output:
+  html_document:
+    css: ./lab.css
+    highlight: pygments
+    theme: cerulean
+  pdf_document: default
+---
+
+## North Carolina births
+
+In 2004, the state of North Carolina released a large data set containing 
+information on births recorded in this state. This data set is useful to 
+researchers studying the relation between habits and practices of expectant 
+mothers and the birth of their children. We will work with a random sample of 
+observations from this data set.
+
+## Exploratory analysis
+
+Load the `nc` data set into our workspace.
+
+```{r load-data, eval=TRUE}
+load("more/nc.RData")
+```
+
+We have observations on 13 different variables, some categorical and some 
+numerical. The meaning of each variable is as follows.
+
+variable         | description
+---------------- | -----------
+`fage`           | father's age in years.
+`mage`           | mother's age in years.
+`mature`         | maturity status of mother.
+`weeks`          | length of pregnancy in weeks.
+`premie`         | whether the birth was classified as premature (premie) or full-term.
+`visits`         | number of hospital visits during pregnancy.
+`marital`        | whether mother is `married` or `not married` at birth.
+`gained`         | weight gained by mother during pregnancy in pounds.
+`weight`         | weight of the baby at birth in pounds.
+`lowbirthweight` | whether baby was classified as low birthweight (`low`) or not (`not low`).
+`gender`         | gender of the baby, `female` or `male`.
+`habit`          | status of the mother as a `nonsmoker` or a `smoker`.
+`whitemom`       | whether mom is `white` or `not white`.
+
+1.  What are the cases in this data set? How many cases are there in our sample?
+
+**The cases in this dataset are births in North Carolina from 2004.There are 1000 cases in our sample as shown by the clode below.**
+
+```{r}
+dim(nc)[1]
+```
+
+
+As a first step in the analysis, we should consider summaries of the data. This
+can be done using the `summary` command:
+
+```{r summary, eval=TRUE}
+summary(nc)
+```
+
+As you review the variable summaries, consider which variables are categorical 
+and which are numerical. For numerical variables, are there outliers? If you 
+aren't sure or want to take a closer look at the data, make a graph.
+
+Consider the possible relationship between a mother's smoking habit and the 
+weight of her baby. Plotting the data is a useful first step because it helps 
+us quickly visualize trends, identify strong associations, and develop research
+questions.
+
+2.  Make a side-by-side boxplot of `habit` and `weight`. What does the plot 
+highlight about the relationship between these two variables?library(ggplot)
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+nc %>% filter(!is.na(habit)) %>% 
+  ggplot() + 
+  aes(x = habit, y = weight) + 
+  geom_boxplot()
+```
+
+**While there is quite a bit of variation in the "nonsmoker" distribution, it does appear that as a whole nonsmokers have babies with higher birthweights than their smoker counterparts. The median value for nonsmoker birth weights is higher than smokers as well as the IQR.**
+
+The box plots show how the medians of the two distributions compare, but we can
+also compare the means of the distributions using the following function to 
+split the `weight` variable into the `habit` groups, then take the mean of each
+using the `mean` function.
+
+```{r by-means, eval=TRUE}
+by(nc$weight, nc$habit, mean)
+```
+
+There is an observed difference, but is this difference statistically 
+significant? In order to answer this question we will conduct a hypothesis test.
+
+## Inference
+
+3.  Check if the conditions necessary for inference are satisfied. Note that 
+you will need to obtain sample sizes to check the conditions. You can compute 
+the group size using the same `by` command above but replacing `mean` with 
+`length`.
+
+**Condition 1: Independence - We are not given much information about the original data set and how it was gathered, however, we know that our sample of 1,000 was a random sample. Leaning on this, we can also assume that the two groups are independent as well. Also, I think just by the nature of the type of data this is (births), we can assume that the condition for independence has been met. We will now check the coniditions to see if the sample size is greater than 30. **
+
+```{r}
+by(nc$weight, nc$habit, length)
+```
+
+**Because both sets contain more than 30 obeservations, we can consider this condition satisfied. Next we need to look and see that there are not any extreme outliers and that the distributions are fairly normal.**
+
+```{r}
+nc %>% filter(!is.na(habit)) %>% 
+  ggplot() + 
+  aes(x = weight) + 
+  geom_histogram(bins = 30) + 
+  facet_wrap(~habit)
+```
+
+**In looking at the above distributions, they both look somewhat normal. There do appear to be some outliers, so let's check on that with the code below:**
+
+```{r}
+two_sd <- nc %>% filter(habit == "nonsmoker") %>% select(weight) %>% unlist()
+two_sd_smoke <- nc %>% filter(habit == "smoker") %>% select(weight) %>% unlist()
+#two_sd
+upper_non_smoke <- mean(two_sd) + sd(two_sd) *2
+lower_non_smoke <- mean(two_sd) - sd(two_sd) *2
+
+upper_smoke <- mean(two_sd_smoke) + sd(two_sd_smoke) *2
+lower_smoke <- mean(two_sd_smoke) - sd(two_sd_smoke) *2
+
+paste0("Nonsmoker two std dev: ", lower_non_smoke,", ", upper_non_smoke)
+paste0("Smoker two std dev: ", lower_smoke,", ", upper_smoke)
+
+range(two_sd)
+range(two_sd_smoke)
+```
+
+**It looks like there are some outliers that fall outside of two standard deviations. However, it doesn't look like these fall far enough away from the mean to call these "extreme" outliers.**
+
+4.  Write the hypotheses for testing if the average weights of babies born to 
+smoking and non-smoking mothers are different.
+
+**H0: Average birth weights of babies born to smoking and non-smoking mothers are the same.**  
+
+**HA: Average birth weights of babies born to smoking and non-smoking mothers are DIFFERENT.**
+
+Next, we introduce a new function, `inference`, that we will use for conducting
+hypothesis tests and constructing confidence intervals. 
+
+```{r, eval=TRUE, tidy=FALSE}
+inference(y = nc$weight, x = nc$habit, est = "mean", type = "ht", null = 0, 
+          alternative = "twosided", method = "theoretical")
+```
+
+Let's pause for a moment to go through the arguments of this custom function. 
+The first argument is `y`, which is the response variable that we are 
+interested in: `nc$weight`. The second argument is the explanatory variable, 
+`x`, which is the variable that splits the data into two groups, smokers and 
+non-smokers: `nc$habit`. The third argument, `est`, is the parameter we're 
+interested in: `"mean"` (other options are `"median"`, or `"proportion"`.) Next
+we decide on the `type` of inference we want: a hypothesis test (`"ht"`) or a 
+confidence interval (`"ci"`). When performing a hypothesis test, we also need 
+to supply the `null` value, which in this case is `0`, since the null 
+hypothesis sets the two population means equal to each other. The `alternative`
+hypothesis can be `"less"`, `"greater"`, or `"twosided"`. Lastly, the `method` 
+of inference can be `"theoretical"` or `"simulation"` based.
+
+5.  Change the `type` argument to `"ci"` to construct and record a confidence 
+interval for the difference between the weights of babies born to smoking and 
+non-smoking mothers.
+
+```{r eval=TRUE, tidy=FALSE}
+inference(y = nc$weight, x = nc$habit, est = "mean", type = "ci", null = 0, 
+          alternative = "twosided", method = "theoretical")
+```
+
+
+By default the function reports an interval for ($\mu_{nonsmoker} - \mu_{smoker}$)
+. We can easily change this order by using the `order` argument:
+
+```{r inf-weight-habit-ci, eval=TRUE, tidy=FALSE}
+inference(y = nc$weight, x = nc$habit, est = "mean", type = "ci", null = 0, 
+          alternative = "twosided", method = "theoretical", 
+          order = c("smoker","nonsmoker"))
+```
+
+* * *
+
+## On your own
+
+-   Calculate a 95% confidence interval for the average length of pregnancies 
+(`weeks`) and interpret it in context. Note that since you're doing inference 
+on a single population parameter, there is no explanatory variable, so you can 
+omit the `x` variable from the function.
+
+```{r eval=TRUE, tidy=FALSE}
+inference(y = nc$weeks,  est = "mean", type = "ci", method = "theoretical")
+```
+
+**We are 95% confident that the average length of pregnancies in weeks is between 38.15 and 38.52 weeks.**
+
+-   Calculate a new confidence interval for the same parameter at the 90% 
+confidence level. You can change the confidence level by adding a new argument 
+to the function: `conflevel = 0.90`.
+
+```{r eval=TRUE, tidy=FALSE}
+inference(y = nc$weeks,  est = "mean", type = "ci", method = "theoretical", conflevel = 0.90)
+```
+
+
+-   Conduct a hypothesis test evaluating whether the average weight gained by 
+younger mothers is different than the average weight gained by mature mothers.
+
+**H0: Average weight gained by younger mothers is the same as average weight gained by mature mothers**  
+
+**HA: Average weight gained by younger mothers is DIFFERENT than the average weight gained by mature mothers**
+
+```{r inf-weight-habit-ht, eval=TRUE, tidy=FALSE}
+inference(y = nc$gained, x = nc$mature, est = "mean", type = "ht", null = 0, 
+          alternative = "twosided", method = "theoretical")
+```
+
+**Based on the above p-value of 0.1686 being greater than 0.05, we would not say that there is not enough evidence to reject the null hypothesis.**
+
+-   Now, a non-inference task: Determine the age cutoff for younger and mature 
+mothers. Use a method of your choice, and explain how your method works.
+
+**In the code below, I call the "by" function which takes in the mother's age and then breaks that in to a group for "younger mom" and "mature mom". The function then calculates the range of the two different groups, which we can then look at to determine where the age breaks are. **
+
+```{r}
+by(nc$mage, nc$mature, range)
+```
+
+**Based on the above, it appears that the "younger mom" begins at age 13 and go up to and includes age 34. The mature mom begins and includes age 35 and go to age 50.The boxplot below also shows the range in a visual way.**
+
+```{r}
+ggplot(nc) +
+  aes( x = 1, y = mage) + 
+  geom_boxplot() + 
+  facet_wrap(~mature)
+```
+
+-   Pick a pair of numerical and categorical variables and come up with a 
+research question evaluating the relationship between these variables. 
+Formulate the question in a way that it can be answered using a hypothesis test
+and/or a confidence interval. Answer your question using the `inference` 
+function, report the statistical results, and also provide an explanation in 
+plain language.
+
+**RESEARCH QUESTION: I want to determine if the average number of visits by white women is DIFFERENT than not white women.**
+
+**HO: The average number of visits by white women and not white women is not different.**  
+
+**HA: The average number of visits by white women and not white women is is DIFFERENT**
+
+```{r eval=TRUE, tidy=FALSE}
+inference(y = nc$visits, x = nc$whitemom, est = "mean", type = "ht", null = 0, 
+          alternative = "twosided", method = "theoretical")
+```
+
+**Based on the low p-value above of 0.0232 (below 0.05), we wil reject the null hypothesis and say there is significant evidence that the average number of visits by white women and not white women is different. In plain english, we can say that based on the data, there is evidence that white women have more doctor visits than not white women. While there is often random variation, the difference between the means is significant enough that it provides evidence that the difference is not only explained by random variation.**
+
+
+
+<!-- This is a product of OpenIntro that is released under a Creative Commons Attribution-ShareAlike 3.0 Unported. This lab was written by Mine Çetinkaya-Rundel and Andrew Bray. -->
