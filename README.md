@@ -19,6 +19,6 @@ Week 7 Lab: Inference for Categorical Data: http://htmlpreview.github.io/?https:
 
 Week 8 Lab: Inference for Numerical Data: http://htmlpreview.github.io/?https://github.com/christianthieme/MSDS-DATA606/blob/master/8%20Week%20-LAB-7-DATA606---Inference-for-Numerical-Data.html
 
-Week 9 Lab: Linear Regression: http://htmlpreview.github.io/?
+Week 9 Lab: Linear Regression: http://htmlpreview.github.io/?https://github.com/christianthieme/MSDS-DATA606/blob/master/9%20Week%20Ch-8-Linear-Regression-DATA606.html
 
 Week 10 Lab: Multiple Linear Regression: http://htmlpreview.github.io/?
