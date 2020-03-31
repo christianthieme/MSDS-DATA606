@@ -5,61 +5,140 @@ date: "3/30/2020"
 output: html_document
 ---
 
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(psych)
+```
+
 
 ### Data Preparation
 
-```{r setup, echo=TRUE, results='hide', warning=FALSE, message=FALSE}
+```{r message=FALSE, warning=FALSE}
 # load data
-
+data <- readr::read_csv("https://raw.githubusercontent.com/christianthieme/MSDS-DATA606/master/Analysis%20Project/depression.csv")
+head(data)
 ```
 
 
 ### Research question 
 
-**Which factors are most predictive of depression in international students?**
+Which factors are most predictive of depression in international students? Are there differences between genders in depression rate? Does having an intimate relationship affect depression rate? Does being religious affect depression rate?
 
 
 ### Cases 
 
-**What are the cases, and how many are there?**
+The cases are international and domestic students from an international university in Japan. There are 268 cases.
 
 
 
 ### Data collection 
 
-**Describe the method of data collection.**
-
-
+This data set was collected through survey as part of a research paper by Minh-Hoang Nguyen, Manh-Toan Ho, Quynh-Yen T. Nguyen, and Quan-HOang Voung in an effort to determine "Help-Seeking Behanviors in a Mulitcultural Environment". This research was requested by the Research Office of Ritsumeikan Asia Pacific University.The study can be found [here](https://www.mdpi.com/2306-5729/4/3/124#).
 
 ### Type of study 
 
-**What type of study is this (observational/experiment)?**
-
+This is an observational study.
 
 
 ### Data Source 
 
-**If you collected the data, state self-collected. If not, provide a citation/link.**
+The data set can be downloaded [here](https://www.mdpi.com/2306-5729/4/3/124/s1). For this project, I will store the data set in my GitHub account [here](https://raw.githubusercontent.com/christianthieme/MSDS-DATA606/master/Analysis%20Project/depression.csv).
+
+
+### Response Variable
+
+The response variable is the "Total score of depression measured by PHQ-9". PHQ-9 is a "Patient Health Questionnaire" used to assess/diagnose depression. More info about PHQ-9 can be found [here](https://aims.uw.edu/resource-library/phq-9-depression-scale). PHQ-9 scale is from 0-24, with 24 being severely depressed. The variable is numeric.
 
 
 
+### Explanatory Variable(s)
 
-### Dependent Variable
+For my first question, the point of my analysis is to find which of the variables is the strongest predictor of depression (which is the independent variable with the greatest effect). There may be several variables that play a factor. I would like to find which one plays the largest role. The variables are as follows (all are numeric):
 
-**What is the response variable? Is it quantitative or qualitative?**
-
-
-
-### Independent Variable
-
-**You should have two independent variables, one quantitative and one qualitative.**
-
-
+* ToSC - Total Social Connectedness Score
+* APD - Perceived Descrimination score
+* AHome - Homesickness score
+* APH - Perceived Hatred score
+* AFear - Fear score
+* ACS - Culture Shock score
+* AGuilt - Guilt score
+* AMiscell - Miscellaneous score
+* ToAS - Acculturative Stress
 
 ### Relevant summary statistics 
 
-**Provide summary statistics for each the variables. Also include appropriate visualizations related to your research question (e.g. scatter plot, boxplots, etc). This step requires the use of R, hence a code chunk is provided below. Insert more code chunks as needed.**
+PHQ-9 summary data:
 
 ```{r}
-
+describe(data$ToDep)
 ```
+
+```{r}
+hist(data$ToDep)
+```
+
+
+Total social connectedness summary statistics:
+
+```{r}
+describe(data$ToSC)
+```
+
+Perceived descrimination:
+
+```{r}
+describe(data$APD)
+```
+
+Homesickness:
+
+```{r}
+describe(data$AHome)
+```
+
+Perceived Hatred:
+
+```{r}
+describe(data$APH)
+```
+
+Fear:
+
+```{r}
+describe(data$Afear)
+```
+
+Culture Shock:
+
+```{r}
+describe(data$ACS)
+```
+
+Guilt:
+
+```{r}
+describe(data$AGuilt)
+```
+
+Miscellaneous:
+
+```{r}
+describe(data$AMiscell)
+```
+
+Total score of Acculturative Stress:
+
+```{r}
+describe(data$ToAS)
+```
+
+Correlation to depression: 
+
+```{r}
+cor(na.omit(data[,c(18,20:28)]))[,1]
+```
+
+```{r}
+barplot(cor(na.omit(data[,c(18,20:28)]))[,1])
+```
+
