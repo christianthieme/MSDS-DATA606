@@ -1,0 +1,726 @@
+---
+title: "Factors Associated with Depression in International Students"
+subtitle: "DATA606 - Final Project"
+author: "Christian Thieme"
+date: "5.9.2020"
+output:
+  rmarkdown::html_document:
+    theme: "readable"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The purpose of this statistical analysis is to answer the following question: 
+
+_**Which factors are most predictive of depression in college students?**_
+
+Depression seems to be an issue that is more and more common among college students. Through several community service activities I regularly participate in, I have had, and continue to have, many opportunities to associate with young adults preparing to enter college or that are in their first several years of college. On numerous occasions I've seen depression set in on these young adults that just months before were at the top of the world. Some of these individuals are ones you know from the beginning will struggle, however, many of them come as a surprise to me when I learn that they are struggling. What factors are contributing to this onset? If we know which factors are associated with the onset of depression, we have a better chance of helping these young adults as they venture in to a pivotal time in their lives. 
+
+## Data
+
+The data set that we will analyze as we strive to answer the above question contains variables that relate to the socio-demographic and mental health of 268 college students from Ritsumeikan Asia Pacific University in Japan. This data was collected through a survey as part of a research study done by the university. The university is famous for it's multicultural environment, where half of the student population are international students. This fact can potentially make answering our research question more complex, but additionally, it will add more validity to the results as the data set contains survey results from a mix of different nationalities and cultures, not just Japanese students. 
+
+The column (or variable) in the data set that we are interested in is the "Total score of depression measure by PHQ-9" designated in our data as "TotalDepressionScore". PHQ-9 is a “Patient Health Questionnaire” which is frequently used by mental health professionals to assess and diagnose depression. Additional information about PHQ-9 can be found [here](https://aims.uw.edu/resource-library/phq-9-depression-scale). The results of a PHQ-9 questionnaire return a number from 0-25, with 0-4 considered as minimal depression, 5-9 considered as mild depression, 10-14 considered as moderate depression, 15-19 considered as moderate to severe depression, and 20-25 considered as severely depressed. Variables that we will consider in our analysis of association include categorical variables describing whether the student is an international student or not, the sex of the student, whether the student has an intimate partner or not, and if the student is religious or not. Numeric, discrete variables that we will consider include age, a social connectedness score measured on a range from 1-48, and an Acculturative Stress score ranging from 36-145 (this variable is the sum of responses from 7 variables: perceived discrimination, homesickness, perceived hatred, fear, cultural shock, guilt, and miscellaneous as measured by questions relating to the Acculturative Stress Scale in the survey).
+
+As this data was gathered from a survey, this is an observational study. In the case of a survey, researchers are not influencing outcomes and so do not set experiment and control groups or apply any type of treatment. The purpose is simply to obtain information from the respondents. As this is an observational study (with random sampling - based on the way the survey was conducted), we can generalize the results of the study to the population the data was surveyed from. In this case, the population of interest is university students at Asia Pacific University. We cannot generalize past the university students at APU because other students were not included in the study. For example, these results could not be generalized to all American university students because they did not include any American universities in their surveying. 
+
+In using survey data there is always a potential for bias. There is a potential for "voluntary response" bias here as completion of the response was on a voluntary basis. Perhaps only those students with concerns about their mental health responded, or perhaps students who were struggling with their mental health did not feel comfortable answering questions about their struggles. Additionally, a larger proportion of women responded to the survey than men, so it's possible these results would not generalize to men within the population if not enough men were sampled, or were not an accurate representation of the male population at APU. 
+
+Due to the nature of this study, the results can provide evidence of a "naturally occurring association between variables, but they cannot by themselves show a casual connection" (OpenIntro Statistics, 2019). To establish causation, we could take these results and create an experiment using random sampling and random assignment and then could use the results to establish causality.  
+
+## Exploratory Data Analysis - Part I: Understanding the Data
+
+Let's begin our analysis by loading the libraries we will be using:
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(readr)
+library(forcats)
+```
+
+
+Next, we'll read in the data. The original data set can be found [here](https://www.mdpi.com/2306-5729/4/3/124/htm). I have downloaded the data as a CSV and am reading it from my GitHub [here](https://raw.githubusercontent.com/christianthieme/MSDS-DATA606/master/Analysis%20Project/depression.csv).
+
+```{r message=FALSE}
+data <- readr::read_csv("https://raw.githubusercontent.com/christianthieme/MSDS-DATA606/master/Analysis%20Project/depression.csv")
+```
+
+
+The data contains some other extraneous columns that we won't be using for our analysis, so I'll go ahead and drop those.
+```{r}
+dep <- data %>% 
+  dplyr::select("inter_dom", "Gender", "Age", "Intimate", "Religion", "ToSC", "ToAS", "ToDep", "DepSev") %>% 
+  dplyr::rename("InterOrDomestic"="inter_dom", 
+                "SocialConnectedness" = "ToSC", 
+                "TotalAcculturativeStress" = "ToAS", 
+                "TotalDepressionScore" = "ToDep", 
+                "DepressionSeverity" = "DepSev")
+head(dep)
+```
+
+Looking at the output above, it looks like we have some null values in our data. Let's see how pervasive these values are before moving on with our analysis. 
+
+```{r}
+colSums(is.na(dep))
+```
+
+```{r}
+dep %>% filter(is.na(Gender))
+```
+
+Looking at the above output, all these rows and columns are blank so we will go ahead and drop them. 
+
+```{r}
+dep <- dep %>% filter(!is.na(Gender))
+colSums(is.na(dep))
+```
+
+After filtering out the blank rows, it looks like we now only have 8 nulls in the "Intimate" column. 
+
+Before diving in to how each of these variables relates to our variable of interest, "TotalDepressionScore", let's look at some summary statistics and the distribution of each variable above so we can get a high-level understanding of the data set. 
+
+#### International or Domestic Student Summary Statistics
+
+```{r}
+base::table(dep$InterOrDomestic)
+```
+
+```{r}
+intOrDom <- dep %>% 
+  dplyr::select(InterOrDomestic) %>% 
+  dplyr::count(InterOrDomestic) %>%
+  dplyr::mutate(percent_total = n / sum(n))
+ 
+
+ggplot(intOrDom) + 
+  aes(x = reorder(InterOrDomestic, desc(percent_total)), y = percent_total) + 
+  geom_col() +
+  geom_text(aes(label = base::round(percent_total, 2)), vjust = -0.5) +
+  labs(title = "Student Type Proportion") + 
+  ylab("%") + 
+  xlab("") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+It looks like our data only has 67 domestic students making up about 25% of the data and the other 201 observations, or 75%, are international students. As mentioned above, we'll have to watch this, because this could definitely lead to some bias. 
+
+#### Gender Summary Statistics
+
+```{r}
+base::table(dep$Gender, exclude = NULL)
+```
+
+```{r}
+gender <- dep %>% 
+  dplyr::select(Gender) %>% 
+  dplyr::count(Gender) %>%
+  dplyr::mutate(percent_total = n / sum(n))
+ 
+
+ggplot(gender) + 
+  aes(x = Gender, y = percent_total) + 
+  geom_col() +
+  geom_text(aes(label = base::round(percent_total, 2)), vjust = -0.5) +
+  labs(title = "Gender Proportion") + 
+  ylab("%") + 
+  xlab("") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+In looking at the count and chart above, it looks like there are significantly more females in the sample than males, as we noted in the bias section. 
+
+#### Age Summary Statistics
+
+```{r}
+summary(dep$Age)
+```
+
+```{r}
+graphics::hist(dep$Age, main = "Distribution of Students' Age", xlab = "Age")
+```
+
+In looking at the above summary statistics and histogram, it looks like the youngest student in our population is 17 and the oldest is 31, giving us a range of 14 years. The mean appears to be ~21, although in this case because of some of the outliers, we would probably look at the median in this case which is 20. This age distribution is strongly right skewed, with 75% of students being 22 or younger. 
+
+#### Intimate Relationship Summary Statistics
+
+```{r}
+base::table(dep$Intimate, exclude = NULL)
+```
+
+```{r}
+intim <- dep %>% 
+  dplyr::select(Intimate) %>% 
+  dplyr::count(Intimate) %>%
+  dplyr::mutate(percent_total = n / sum(n))
+ 
+
+ggplot(intim) + 
+  aes(x = Intimate, y = percent_total) + 
+  geom_col() +
+  geom_text(aes(label = base::round(percent_total, 2)), vjust = -0.5) +
+  labs(title = "Intimate Partner or Not Proportion") + 
+  ylab("%") + 
+  xlab("") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+It appears that 59% of students do not have an intimate partner. We also note that there are 8 observations, or 3%, that are NULL values. 
+
+#### Religion Summary Statistics
+
+```{r}
+base::table(dep$Religion, exclude = NULL)
+```
+
+```{r}
+relig <- dep %>% 
+  dplyr::select(Religion) %>% 
+  dplyr::count(Religion) %>%
+  dplyr::mutate(percent_total = n / sum(n))
+ 
+
+ggplot(relig) + 
+  aes(x = Religion, y = percent_total) + 
+  geom_col() +
+  geom_text(aes(label = base::round(percent_total, 2)), vjust = -0.5) +
+  labs(title = "Religious or Not Proportion") + 
+  ylab("%") + 
+  xlab("") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+It looks like about 1/3 of the students are religious, with 2/3 identifying as not religious.
+
+#### Social Connectedness Summary Statistics
+
+```{r}
+summary(dep$SocialConnectedness)
+```
+
+```{r}
+graphics::hist(dep$SocialConnectedness, main = "Distribution of Social Connectedness Score", xlab = "Score")
+```
+
+The distribution of the Social Connectedness Score is left skewed. The minimum value here is 8 and the max is 48, making the range 40. The mean value is 37.47. One thing to note about this score is that it is actually the accumulation of scores from eight questions (each question is rated on a 6-point scale, 1-6, meaning a score of 8 is someone selecting the lowest option 8 times and a score of 48 is someone selecting the highest option each time). 
+
+#### Acculturative Stress Score Summary Statistics
+
+```{r}
+summary(dep$TotalAcculturativeStress)
+```
+
+```{r}
+graphics::hist(dep$TotalAcculturativeStress, main = "Distribution of Acculturative Stress Score", xlab = "Score")
+```
+
+The minimum value is 36 and the maximum value is 145, making the range 109. The distribution for acculturative stress is slightly right skewed, with 75% of students having a score of 88 or lower. As a reminder, this variable is the sum of responses from 7 variables: perceived discrimination, homesickness, perceived hatred, fear, cultural shock, guilt, and miscellaneous as measured by questions relating to the Acculturative Stress Scale in the survey.
+
+#### Total Depression Summary Statistics - Understanding our Variable of Interest
+
+```{r}
+summary(dep$TotalDepressionScore)
+```
+
+```{r}
+graphics::hist(dep$TotalDepressionScore, main = "Distribution of Total Depression Score", xlab = "Score")
+```
+
+The minimum value here is 0 and the maximum value is 25, making the range 25. The distribution is right skewed with a mean of 8.187. 75% of the distribution is equal to a score of 11 or lower. Let's now drill down one level and see what the proportion is for each category of depression as mentioned above (min, mild, mod, modsev, sev).
+
+```{r}
+base::table(dep$DepressionSeverity, exclude = NULL)
+```
+
+```{r}
+depsev <- dep %>% 
+  dplyr::select(DepressionSeverity) %>% 
+  dplyr::count(DepressionSeverity) %>%
+  dplyr::mutate(percent_total = n / sum(n))
+ 
+depsev$DepressionSeverity <- factor(depsev$DepressionSeverity, levels = c("Min", "Mild", "Mod", "ModSev", "Sev"))
+
+ggplot(depsev) + 
+  aes(x = DepressionSeverity, y = percent_total) + 
+  geom_col() +
+  geom_text(aes(label = base::round(percent_total, 2)), vjust = -0.5) +
+  labs(title = "Depression Severity Proportion") + 
+  ylab("%") + 
+  xlab("") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+The results here are surprising. It looks like ~67% of all students have mild to moderate depression. That seems to be an extremely high rate. On a positive note, it looks like only ~10% of students have moderate to severe depression. 
+
+## Exploratory Data Analysis - Part II: Understanding the Variable of Interest - Total Depression Score
+
+In this section we will explore how our variable of interest relates to the other variables in our data set. Let's first look at the difference in the Total Depression Score between international students and domestic students. 
+
+#### International an Domestic Students and Total Depression Score
+
+```{r}
+dom <- dep %>% 
+  filter(InterOrDomestic == 'Dom') 
+
+summary(dom$TotalDepressionScore)
+```
+
+```{r}
+inter <- dep %>% 
+  filter(InterOrDomestic == 'Inter') 
+
+summary(inter$TotalDepressionScore)
+```
+
+```{r}
+ggplot(dep) + 
+  aes(x = InterOrDomestic, y = TotalDepressionScore) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Total Depression Score by Student Type") +
+  xlab("Student Type") + 
+  ylab("Total Depression Score") +
+  coord_flip()
+```
+
+Looking at the boxplots above, we can see that there is a difference in the distributions of Total Depression Score between domestic students and international students. The results are incredibly shocking. It appears that international students, have a lower median Total Depression Score than do domestic students. In addition, the 1st quartile for international students begins at 4.0, where for domestic students starts at 6.0. Both international and domestic students 3rd quartile ends at 11.0. This means that overall, international students have a wider spread in the lower ranges of the total depression score than do the domestic students, meaning, there were more frequent occurrences at low scores than the domestic students. For domestic students, the 1st quartile starts at 6.0 which means this IQR is more condensed, which suggests that a higher concentration of the data is held at these slightly higher Total Depression Scores than the international students. I would have guessed that international students would have higher depression scores because they are away from home in an area where they may not know as many people. Although, perhaps those who are willing to study abroad are more adventurous, outgoing, and sure of themselves which would lend to a lower depression rate? We'll see if we can answer some of these questions as we progress through our analysis. One item to remember here is that 75% of our distribution is made of international students, so there very well could be some bias at play here if we did not get enough representative samples from domestic students. 
+
+#### Gender and Total Depression Score
+
+```{r}
+male <- dep %>% 
+  filter(Gender == 'Male') 
+
+summary(male$TotalDepressionScore)
+```
+
+```{r}
+female <- dep %>% 
+  filter(Gender == 'Female') 
+
+summary(female$TotalDepressionScore)
+```
+
+```{r}
+ggplot(dep) + 
+  aes(x = Gender, y = TotalDepressionScore) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Total Depression Score by Gender") +
+  xlab("") + 
+  ylab("Total Depression Score") +
+  coord_flip()
+```
+
+Looking at the boxplot above it appears that, generally speaking, female students have a higher Total Depression score than their male counterparts. As in the analysis above, one thing to note here is females make up about 2/3 of our population. It is possible that we did not obtain a representative sample from male students. 
+
+#### Age and Total Depression Score
+
+```{r}
+ggplot(dep) + 
+  aes(x = Age, y = TotalDepressionScore, color = Gender) + 
+  geom_jitter() +
+  labs(title = "Age and Total Depression Score Scatter Plot")
+```
+
+In looking at the scatter plot above, it looks like depression is really concentrated for students age 18-22. Based on our histogram in the last section of ages, we do have significantly fewer observations at age 22 and above, however, regardless, it does look like as we get past age 24, severity of depression declines. The relationship here does not look to be linear. One other item to note is that it appears that the majority of older students in our data set are females. 
+
+#### Students with an Intimate Partner and Total Depression Score
+
+```{r}
+intimate <- dep %>% 
+  filter(Intimate == 'Yes') 
+
+summary(intimate$TotalDepressionScore)
+```
+
+```{r}
+not_int <- dep %>% 
+  filter(Intimate == 'No') 
+
+summary(not_int$TotalDepressionScore)
+```
+
+```{r}
+ggplot(dep) + 
+  aes(x = Intimate, y = TotalDepressionScore) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Total Depression Score by Relationship Type") +
+  xlab("Intimate Relationship?") + 
+  ylab("Total Depression Score") +
+  coord_flip()
+```
+
+Another surprising plot. I would have expected those in an intimate relationship to have a lower Total Depression Score, but it looks like being in an intimate relationship might not have a noticeable effect on the Total Depression Score. 
+
+#### Religion and Total Depression Score
+
+```{r}
+rel <- dep %>% 
+  filter(Religion == 'Yes') 
+
+summary(rel$TotalDepressionScore)
+```
+
+```{r}
+not_rel <- dep %>% 
+  filter(Religion == 'No') 
+
+summary(not_rel$TotalDepressionScore)
+```
+
+```{r}
+ggplot(dep) + 
+  aes(x = Religion, y = TotalDepressionScore) +
+  geom_boxplot() +
+  labs(title = "Boxplot of Total Depression Score by Religious Belief") +
+  xlab("Religious?") + 
+  ylab("Total Depression Score") +
+  coord_flip()
+```
+
+In looking above at our bar plot on religious beliefs, it looks like only about 1/3 of students are religious. Looking at the boxplot above, we can see that the median values are the same for students who are religious and those who are not, however the IQR for those with religious beliefs looks to be lower than those without. Perhaps people who hold religious beliefs have developed better coping mechanisms to deal with stress through their religion? However, as the medians are the same, religion may not be a significant factor. More analysis is needed. One more item we will look at is if more men or women are religious. 
+
+```{r}
+dep %>% 
+  select(Religion, Gender) %>%
+  ggplot() + 
+  aes(x = Religion, fill = Gender) + 
+  geom_bar(stat = "count", position = "dodge") +
+  labs(title = "Religion by Gender")+ 
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+Looking at the above bar chart, it appears that there is a much higher percentage of women who are not religious than who are, whereas for men the percentages are not tremendously different.
+
+#### Social Connectedness and Total Depression Score
+
+```{r message=FALSE}
+ggplot(dep) + 
+  aes(x = SocialConnectedness, y = TotalDepressionScore, color = Religion) + 
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(title = "Scatter Plot of Social Connectedness and Total Depression Score by Religion")
+```
+
+In the scatter plot above, students with a high social connectedness score do appear to have lower rates of depression. This appears to be a moderately strong inverse linear relationship between these two variables. I included religion in the plot to see if those with religious affiliation were perhaps enjoying more social connection from attending religious meetings, but it does not look like there is a noticeable impact. 
+We will run this same plot to see if there are noticeable trends related to gender: 
+
+```{r message=FALSE}
+ggplot(dep) + 
+  aes(x = SocialConnectedness, y = TotalDepressionScore, color = Gender) + 
+  geom_jitter() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Scatter Plot of Social Connectedness and Total Depression Score by Gender") 
+```
+
+Again, it does not look like there is a noticeable distinction between males and females. 
+
+#### Total Acculturative Stress and Total Depression Score
+
+```{r fig.width=8, message=FALSE}
+ggplot(dep) + 
+  aes(x = TotalAcculturativeStress, y = TotalDepressionScore, color = InterOrDomestic) + 
+  geom_jitter()  +
+  geom_smooth(method = "lm", se = FALSE) + 
+  labs(title = "Scatter Plot of Total Acculturative Stress and Total Depression Score by Student Type")
+```
+
+There does appear to be a moderately strong positive linear relationship between these two variables. Another thing that we notice is that there are only international students at the higher end of the scores for acculturative stress, which is what we would expect. Although, in looking at the plot above, there are a fair number of domestic students with mild to moderate scores, where I would not necessarily expect that. 
+
+We'll run this same plot but this time, scale the color for the social connectedness score. Here I would anticipate that those who were more socially connected would have less acculturative stress and a lower total depression score: 
+
+```{r fig.width=9}
+ggplot(dep) + 
+  aes(x = TotalAcculturativeStress, y = TotalDepressionScore, color = SocialConnectedness) + 
+  geom_jitter(alpha = 0.9) +
+  scale_color_gradient(high = "#132B43", low = "#56B1F7") +
+  labs(title = "Scatter Plot of Total Acculturative Stress and Total Depression Score by Social Connectedness")
+```
+
+In looking at this plot, it doesn't look like there is a recognizable relationship between social connectedness and acculturative stress as it relates to the total depression score. It looks like even those with high social connectedness scores also have mild to moderate acculturative stress. 
+
+## Multiple Regression - Which Factors have a Relationship? 
+
+Now that we've taken a good, hard look at the different variables in our data set and their relationship to the Total Depression Score, let's move forward with determining which factors are most predictive of the Total Depression Score. To do this, we will first fit a model with all variables, and then remove those whose p-value indicates that there is not a linear relationship between the variable and the Total Depression Score. Once we've removed those variables that do not have a linear relationship, we will use the Adjusted R-squared value as a benchmark. Our next step will be to use backward elimination to find the optimal model. Once we have the optimal model, we will go through and see if we meet the conditions for using this model for the purposes of prediction. If we do meet the criteria, we can confidently remove each variable from the final model and then re-run, noting the change in the adjusted R squared value to determine which variables have the largest impact. If we don't meet the criteria for using multiple linear regression, we will note the conditions we fail to meet and possible solutions to resolve. 
+
+Before making our model, we'll need to make a couple adjustments to the categorical variables in our data set. We'll do that now. 
+
+```{r}
+dep_filt <- dep %>%
+  filter(!is.na(Intimate)) %>%
+  select(-DepressionSeverity) #This column is simply a bucketed version of the TotalDepressionScore
+
+dep_reg <- dep_filt %>% 
+  mutate(InterOrDomestic = ifelse(InterOrDomestic == "Inter", 1, 0),
+         Gender = ifelse(Gender == "Male", 0, 1), 
+         Intimate = ifelse(Intimate == "Yes", 1, 0), 
+         Religion = ifelse(Religion == "Yes", 1, 0))
+
+dep_reg
+```
+
+Our data is prepped and ready to go. Let's run it through a multiple regression model and see where we land. 
+
+```{r}
+initial <- lm(TotalDepressionScore ~ InterOrDomestic + Gender + Age + Intimate + Religion + SocialConnectedness + TotalAcculturativeStress, data = dep_reg)
+```
+
+```{r}
+summary(initial)
+```
+
+In looking at the above output from the model, it doesn't look like any of these variables have a strong relationship with the Total Depression Score except for the Social Connectedness Score and the Total Acculturative Stress Score. The variable with the highest p-value is Intimate. We saw in our initial analysis in looking at the boxplots between students who had an intimate partner vs those who didn't had almost the exact same distribution of Total Depression Scores. So it makes sense that we see a very high p-value here. Let's remove this variable and re-run our model. Before re-running, we'll take note that our baseline Adjusted R-Squared value is 0.3375.
+
+```{r}
+second <- lm(TotalDepressionScore ~ InterOrDomestic + Gender + Age + Religion + SocialConnectedness + TotalAcculturativeStress, data = dep_reg)
+summary(second)
+```
+
+Removing the Intimate variable did increase our model's fit slightly. Our Adjusted R-Squared is now 0.3394. We'll move forward with the process of backward elimination until we find the optimal model. I'll show the final model below that resulted in the highest Adjusted R-Squared value: 
+
+```{r}
+final <- lm(TotalDepressionScore ~ InterOrDomestic + Age +  SocialConnectedness + TotalAcculturativeStress, data = dep_reg)
+summary(final)
+```
+
+Our final model returns an Adjusted R-Squared value of 0.3411. We removed the Gender and Religion variables from our model. Let's now dig into the output of this optimized model. In looking at the slope of our variables, it looks like when a student is an international student (1), it decreases the prediction for the Total Depression Score. For Age and Social Connectedness, the slope of our line decreases as these two variables increase. Total Acculturative Stress is the only variable with a positive relationship to the Total Depression Score. As Total Acculturative Stress increases, so does the slope of our line and our predicted Total Depression Score. Another item to note is that our intercept starts all the way at 17.98, which seems high. If you remember, the Total Depression Score ranges from 0-25, however, as previously noted, most of our variables have an inverse relationship with the Total Depression Score, meaning as the values increase, the Total Depression Score will decrease. Finally, we'll note the equation for our model: 
+
+$\hat{y} = 17.98263 + (-0.81683 * InterOrDomestic) + (-0.10237 * Age) + (-0.25393 * SocialConnectedness) + (0.03623 * TotalAcculturativeStress)$
+
+## Have we Met the Conditions to use Multiple Regression?
+
+Now that we have our optimized model, it's time to see if we meet the requirements for using multiple regression to determine if we can rely on the results of this model. 
+
+1. We'll first check the residuals of our model to see if they are nearly normal, although this is less important for larger data sets (OpenIntro Statistics, 2019). 
+
+```{r}
+hist(final$residuals, main = "Histogram of Residuals from Final Model", xlab = "Residuals")
+```
+
+It appears that our residuals are nearly normal, so we can confirm that we have met this requirement. We do note that there is a slight outlier, but it is not an extreme outlier. 
+
+2. Next we'll check to see if the variability of the residuals is nearly constant. 
+
+```{r}
+plot(final$residuals ~ final$fitted.values, main = "Scatter Plot of Residuals and Fitted Values", xlab = "Fitted Values", ylab = "Residuals")
+abline(h = 0, lty = 3)
+```
+
+The variability of the residuals appears to be nearly constant. We do note that there may appear to be a slight change in the variation at the upper and lower ends of the fitted values. We can check this with a Q-Q plot. 
+
+```{r}
+qqnorm(final$residuals)
+qqline(final$residuals)
+```
+
+As noted, it does look like there is some slight changes in the variation at the higher and lower ends of the values. It does appear that for a majority of values, the variation is nearly constant. We will consider this condition met, but make sure to note this in our conclusion to be fully transparent to anyone who may use the model. 
+
+3. Next we will ensure that the residuals are independent. 
+
+Based on our knowledge of the data set and how it was gathered as well as our thorough analysis of the data, we can confidently say that the residuals are independent. This criterion has been met. 
+
+4. Last, we'll confirm that each variable is linearly related to the outcome. 
+
+We saw above in our scatter plots that the Total Acculturative Stress Score and the Total Social Connectedness score were linearly related to the total depression score. Our two other variables are categorical variables with two levels, and so meet the condition for being linearly related by definition. This condition has been met. 
+
+## Which Factors are most Predictive of Depression in College Students?
+
+First of all, based on what we know now about the data, how it was gathered, and what type of study this is, we'll need to adjust the question we asked so that we can answer it properly. We will rephrase it to say "which factors are most predictive of depression in college students at Asia Pacific University?". To answer this question, we will use backward elimation to evaluate which variables have the greatest effect on the Adjusted R-Squared value. We'll then order this from the greatest effect to the smallest effect, which will give us our answer. Our baseline Adjusted R-Squred value was 0.3411.
+
+We'll first remove Acculturative Stress:
+
+```{r}
+as <- lm(TotalDepressionScore ~ InterOrDomestic + Age +  SocialConnectedness, data = dep_reg)
+summary(as)
+```
+
+Now, we'll remove Social Connectedness: 
+
+```{r}
+sc <- lm(TotalDepressionScore ~ InterOrDomestic + Age + TotalAcculturativeStress, data = dep_reg)
+summary(sc)
+```
+
+Next we'll remove Age: 
+
+```{r}
+age <- lm(TotalDepressionScore ~ InterOrDomestic + SocialConnectedness + TotalAcculturativeStress, data = dep_reg)
+summary(age)
+```
+
+Lastly, we'll remove InterOrDomestic: 
+
+```{r}
+int_or_dom <- lm(TotalDepressionScore ~ Age + SocialConnectedness + TotalAcculturativeStress, data = dep_reg)
+summary(int_or_dom)
+```
+
+The summary of the model outputs and the changes in Adjusted R-Square are in the table below: 
+
+Variable                   | Adjusted R^2 | Change in Adjusted R^2
+-------------------------- |------------- | ----------------------
+SocialConnectedness        |    0.1925    | 0.1486
+TotalAcculturativeStress   |    0.3263    | 0.0148
+InterOrDomestic            |    0.3388    | 0.0023
+Age                        |    0.3405    | 0.0006
+
+Looking at the above table, we can see that social connectedness is the single greatest predictor of the Total Depression Score for students at APU. Acculturative Stress is next, followed by whether the student is an international or domestic student, followed lastly by their age. 
+
+Let's create one last visual to see if we can capture the relationships of each of these variables: 
+
+```{r}
+ggplot(dep) + 
+  aes(x = SocialConnectedness, y = TotalDepressionScore, size = TotalAcculturativeStress, shape = InterOrDomestic,  color= Age) + 
+  geom_point(alpha = 0.8) +
+  labs (title = "Scatter Plot - Final Model Variables") + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+While a busy chart, it does accurately capture the relationships that we have seen. We can see the inverse linear relationship between the Total Depression Score and the Social Connectedness Score. We can see that as you move to the bottom right hand side of the chart, the shapes become smaller as the Total Depression Score decreases. Additionally, we can see the lighter blue triangles and circles indicating age are, for the most part, located at the bottom right as well. Lastly we can see how all these variables and relationships are broken between both domestic and international students.
+
+## Model Discussion - Thoughts and Limitations
+
+The final model we produced has an Adjusted R-Squared value of 0.3411, which means we are explaining about ~34% of the variation in the Total depression score with the variables in our final model. This means that a significant amount of the variation is explained by factors outside of our model. Depression is a complex illness and can have many variables that can vary substantially between individuals. For this reason, in designing a model, we would not expect to create a model with an incredibly high Adjusted R-Squared value. However, we should expect to create a model that will be, on average, directionally accurate, and will help to further understand key factors that can play a significant role in this illness. The model we have created has achieved that purpose. 
+
+We noted early on that there is a potential for bias due to the fact that the data was gathered from a survey, that 2/3 of the respondents are female, and that 75% of the respondents are international students. In addition, when reviewing the conditions for performing multiple linear regression, we saw that the variability of the residuals may not be nearly constant at the upper and lower bounds of the total depression score. 
+
+## Inference for Linear Regression - Hypothesis Tests
+
+The output of our final model included an estimate of the coefficient for each variable as well as a t-statistic and it's associated p-value. Each of these p-values relates to a hypothesis test. The test can be formally states as: 
+
+${ H }_{ 0 }:\quad The\quad true\quad coefficient\quad of\quad the\quad variable\quad is\quad zero$
+${ H }_{ A }:\quad The\quad true\quad coefficient\quad of\quad the\quad variable\quad is\quad not\  zero$
+
+Where the p-value exceeds 0.05, we would fail to reject the null hypothesis and state there is not enough evidence to suggest that the coefficient is not zero. Where the p-value is less than 0.05, would would reject the null hypothesis and conclude that there is sufficient that the coefficient is not zero. 
+
+For our model we have four tests: 
+
+**InterOrDomestic Hypothesis Test**
+
+${ H }_{ 0 }:\quad The\quad true\quad coefficient\quad of\quad InterOrDomestic\quad is\quad zero$
+${ H }_{ A }:\quad The\quad true\quad coefficient\quad of\quad InterOrDomestic\quad is\quad not\quad  zero$
+
+Our p-value is 0.171, which is greater than 0.05, so in this case we would fail to reject the null hypothesis and state that there is not sufficient evidence to conclude that the coefficient is not zero. 
+
+**Age Hypothesis Test**
+
+${ H }_{ 0 }:\quad The\quad true\quad coefficient\quad of\quad Age\quad is\quad zero$
+${ H }_{ A }:\quad The\quad true\quad coefficient\quad of\quad Age\quad is\quad not\quad  zero$
+
+Our p-value is 0.267, which is greater than 0.05, so in this case we would fail to reject the null hypothesis and state that there is not sufficient evidence to conclude that the coefficient is not zero. 
+
+**Social Connectedness Hypothesis Test**
+
+${ H }_{ 0 }:\quad The\quad true\quad coefficient\quad of\quad SocialConnectedness\quad is\quad zero$
+${ H }_{ A }:\quad The\quad true\quad coefficient\quad of\quad SocialConnectedness\quad is\quad not\quad  zero$
+
+Our p-value is 3.81e-13, which is much smaller than 0.05, so in this case we would reject the null hypothesis and state that there is sufficient evidence to conclude that the coefficient is not zero. 
+
+**Total Acculturative Stress Hypothesis Test**
+
+${ H }_{ 0 }:\quad The\quad true\quad coefficient\quad of\quad TotalAcculturativeStress\quad is\quad zero$
+${ H }_{ A }:\quad The\quad true\quad coefficient\quad of\quad TotalAcculturativeStress\quad is\quad not\quad  zero$
+
+Our p-value is 0.010, which is smaller than 0.05, so in this case we would reject the null hypothesis and state that there is sufficient evidence to conclude that the coefficient is not zero. 
+
+## Inference for Linear Regression - Confidence Intervals
+
+The model we have fit was based off a sample out of a population. Our model gives us the best estimate we have of the true equation of the least squares line of the population, however, if we were to take another sample and refit our model, it is very likely that we would see some slight differences in our coefficients. The only way to find the exact equation of the least squares line would be to use every item in the population to create the line, which in most cases is not possible. As such, we often use our model to infer what the actual line may be, and we can build confidence intervals around the coefficients to give us more certainty around what the true equation of the line is. To build these confidence intervals, we need to have met the conditions for multiple regression, which we discussed earlier and noted we had met the criteria. To give us greater certainty around what the actual coefficients of the true regression line would be, we will create a 95% confidence interval around each slope coefficient. 
+
+The formula we will use to create these confidence intervals is: 
+
+$b_{ i }\pm t{ * }_{ df }\times SE{ \quad b }_{ i }$
+
+The first thing we'll need to do is to calculate our t-critical value. We can do this using the degrees of freedom provided by the output of our model, which is 256 and dividing 0.05 by 2 since we are wanting to build a 95% confidence interval. 
+
+```{r}
+t_critical <- abs(qt(.05/2,256))
+t_critical
+```
+
+Now that we have our t-critical value, we can use the output from our final model which includes the point estimate as well as the SE to create our confidence interval for each coefficient. 
+
+**Confidence Interval for Social Connectedness:**
+
+```{r}
+point_est <- -0.25393
+se <- 0.03314
+
+lower <- point_est - (t_critical * se)
+upper <- point_est + (t_critical * se)
+
+conf_int <- c(lower, upper)
+
+print(conf_int)
+```
+
+We are 95% confident that the true coefficient for Social Connectedness falls between -0.3191917 and -0.1886683.
+
+**Confidence Interval for Total Acculturative Stress:**
+
+```{r}
+point_est <- 0.03623
+se <- 0.01397
+
+lower <- point_est - (t_critical * se)
+upper <- point_est + (t_critical * se)
+
+conf_int <- c(lower, upper)
+
+print(conf_int)
+```
+
+We are 95% confident that the true coefficient for Total Acculturative Stress falls between 0.008719244 and 0.063740756.
+
+**Confidence Interval for InterOrDomestic:**
+
+```{r}
+point_est <- -0.81683
+se <- 0.59435
+
+lower <- point_est - (t_critical * se)
+upper <- point_est + (t_critical * se)
+
+conf_int <- c(lower, upper)
+
+print(conf_int)
+```
+
+We are 95% confident that the true coefficient for InterOrDomestic falls between -1.9872679 and 0.3536079.
+
+**Confidence Interval for Age:**
+
+```{r}
+point_est <- -0.10237
+se <- 0.09207
+
+lower <- point_est - (t_critical * se)
+upper <- point_est + (t_critical * se)
+
+conf_int <- c(lower, upper)
+
+print(conf_int)
+```
+
+We are 95% confident that the true coefficient for Age falls between -0.28368105 and 0.07894105.
+
+As you can see, building a 95% confidence interval does create quite a large range for the coefficients, but does help to provide an understanding of the range where that true population coefficient is most likely to be. 
+
+
+## Conclusion and Next Steps
+
+We found that social connectedness plays a large role in a student's severity of depression. Other factors that play a role are acculturative stress, age, and whether the student is an international or domestic student. The results from our study can be used to help identify students who are at high risk of depression or who may have a more severe case of depression. Educators and college administration can use this data and information to help create plans or programs to proactively strengthen social connectedness and decrease acculturative stress, which would help some of these students in the high-risk areas. As this was an observational study, we cannot say that any one of these variables "causes" depression. We can say that there is a natural association between these variables and depression. As noted above, some additional investigation into the residuals may be necessary to understand the slight deviations we saw in the variation of the residuals. It may be that one of our variables needs to undergo a transformation (log, sqrt, etc.) in order to create a better fitting model. Finally, we should run some of our data through our model and check the predictions against the actuals to see how accurate our model is, which will help us to better understand its strengths and weaknesses. 
+
+## References
+
+Data sourced from: 
+
+* Minh-Hoang Nguyen, Manh-Toan Ho, Quynh-Yen T. Nguyen, and Quan-HOang Voung. (2019). Help-Seeking Behaviors in a Multicultural Environment. *MDPI Open Access Journals* 
+
+Quote for conditions of linear regression from: 
+
+* David M Diez, Mine Cetinkaya-Rundel, Christopher D Barr (2019). *OpenIntro Statistics*
+
