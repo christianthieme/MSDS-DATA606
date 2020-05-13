@@ -22,3 +22,5 @@ Week 8 Lab: Inference for Numerical Data: http://htmlpreview.github.io/?https://
 Week 9 Lab: Linear Regression: http://htmlpreview.github.io/?https://github.com/christianthieme/MSDS-DATA606/blob/master/9%20Week%20Ch-8-Linear-Regression-DATA606.html
 
 Week 10 Lab: Multiple Linear Regression: http://htmlpreview.github.io/?
+
+Final Project: Which Factors are Most Predictive of Depression in College Students?: https://rpubs.com/christianthieme/614147
